@@ -3,9 +3,10 @@
  *
  * rssolve.c
  *
- * $Revision: 1.3 $
+ * $Revision: 1.4 $
  *
  */
+
 #include <stdio.h>
 #include <time.h>
 #include <sys/resource.h>
@@ -15,9 +16,8 @@
 
 #define TIME
 #define AMBIGIOUS
-//#define ONE_SOLUTION 
+#define ONE_SOLUTION 
 #define USE_TABLE
-//#define SLOW 
 
 static long t()
 {
@@ -25,8 +25,6 @@ static long t()
     getrusage(RUSAGE_SELF, &ru);
     return (ru.ru_utime.tv_sec + ru.ru_stime.tv_sec) * RESOLUTION + ru.ru_utime.tv_usec + ru.ru_stime.tv_usec;
 }
-
-
 
 #ifndef USE_TABLE
 #define BOX(X,R,C) X[R / 27 * 27 + C / 3 * 6 + R % 9 / 3 * 3 + C]
@@ -102,10 +100,12 @@ int bitcount (unsigned int n)
 
 int solutions, n, q[81];
 
+int debug = 0;
+
 void rbp(int n)
 {
     int i;
-    for (i=2<<9; i>0; i=i>>1)
+    for (i=2<<15; i>0; i=i>>1)
 	putchar( ( (i&n) ? '1' : '0') );
 
 }
@@ -163,9 +163,7 @@ int solve(int *p)
     int i = 81, j = 0, a = 0;
     int x = 1;
     int c[81];
-#ifndef SLOW 
     int cover[3][9];
-#endif
 
 #ifndef ONE_SOLUTION 
     if (solutions > 0) return 0;
@@ -178,8 +176,6 @@ int solve(int *p)
     for (n = 0; n < 81; n++)
         c[n] = p[n];
 
-    /* find forced cells */
-#ifndef SLOW 
     for (i = 0; i < 9; i++)
     {
 	cover[BOX][i] = cover[COL][i] = cover[ROW][i] = 0; 
@@ -189,83 +185,128 @@ int solve(int *p)
 	    cover[ROW][i] |= NROW(c, i, j);
 	}
     }
-#endif
 
     while (x)
     {
+	int row;
+	int col;
 
         x = 0;
-        for (i = 0; i < 81; i++)
-        {
-            if ( c[i] == 0 )
-            {
-		
+	for (row = 0; row < 9; row++) 
+	    for (col = 0; col< 9; col++) 
+	    {
+		i = (row*9)+col;
 
-#ifndef SLOW
-		a =   cover[BOX][ BOXNUM(i) ] 
-		    | cover[ROW][ ROWNUM(i) ]
-		    | cover[COL][ COLNUM(i) ];
-#else
+		/* find forced cells */
+		if ( c[i] == 0 )
+		{
+		    a =   cover[BOX][ BOXNUM(i) ] 
+			| cover[ROW][ row ]
+			| cover[COL][ col ];
 
-                a = 0;
-                GETCOVER(c, i, j);
+		    if ( bitcount(a) == 8 )
+		    {
+			int d;
+			for ( d = 2; d < 1024; d *= 2)
+			    if ( ~a & d )
+			    {
+				c[i] = d;
+
+				cover[BOX][ BOXNUM(i) ]  |= d;
+				cover[ROW][ row ]  |= d;
+				cover[COL][ col ]  |= d;
+
+				x++;
+				break;
+			    }
+		    }
+		}
+
+#if 0
+		/* find one cells */
+		if ( c[i] == 0 )
+		{
+		    int box = BOXNUM(i);
+		    a = 0;
+		    printf("i=%d ",i);
+		    //foreach cell in box
+		    for (j=0; j<9; j++)
+		    {
+			int mrow = (j/3) + (box/3)*3;
+			int mcol = (j%3) + (box%3)*3;
+			int mi = mrow*9+mcol;
+
+			printf("%d\n",mi);
+
+			//if ( mrow != row || mcol != col) 
+			{
+			    int b = cover[BOX][box] | cover[ROW][mrow ] | cover[COL][mcol];
+			    a |= b;
+			    rbp(a);printf("\n");
+			}
+		    }
+
+		    a = ~a;
+		    rbp(a);printf("\n\n");
+
+		   // if (debug++ > 100) exit(1);
+		    
+		    if ( bitcount(a) > 0 )
+			return 0;
+
+		    if ( bitcount(a) == 1 )
+		    {
+			int d;
+
+			rbp(a);printf("\n\n");
+			return 0;
+
+			for ( d = 2; d < 1024; d *= 2)
+			    if ( a & d )
+			    {
+					c[i] = d;
+
+					cover[BOX][ BOXNUM(i) ]  |= d;
+					cover[ROW][ row ]  |= d;
+					cover[COL][ col ]  |= d;
+
+				x++;
+				break;
+			    }
+		    }
+		}
 #endif
 
-                if ( bitcount(a) == 8 )
-                {
-                    int d;
-                    for ( d = 2; d < 1024; d *= 2)
-                        if ( ~a & d )
-                        {
-                            c[i] = d;
-
-#ifndef SLOW
-			    cover[BOX][ BOXNUM(i) ]  |= d;
-			    cover[ROW][ ROWNUM(i) ]  |= d;
-			    cover[COL][ COLNUM(i) ]  |= d;
-#endif
-
-                            x++;
-                            break;
-                        }
-                }
-            }
-        }
+	    }
     }
 
 
     i = -1;
     for (n = 80; n > 0 ; n--)
-        if (c[n] == 0 )
-        {
-            i = n;
-            break;
-        }
+	if (c[n] == 0 )
+	{
+	    i = n;
+	    break;
+	}
 
     if ( i >= 0 )
     {
-#ifndef SLOW
-		a =   cover[BOX][ BOXNUM(i) ] 
-		    | cover[ROW][ ROWNUM(i) ]
-		    | cover[COL][ COLNUM(i) ];
-#else
+	a =   cover[BOX][ BOXNUM(i) ] 
+	    | cover[ROW][ ROWNUM(i) ]
+	    | cover[COL][ COLNUM(i) ];
 
-                a = 0;
-                GETCOVER(c, i, j);
-#endif
-
-        for (j = 2;j < 1024;j *= 2)
-            if (~a & j)
-            {
-                c[i] = j;
-                solve(c);
-            }
-        return 0;
+	for (j = 2;j < 1024;j *= 2)
+	    if (~a & j)
+	    {
+		c[i] = j;
+		solve(c);
+	    }
+	return 0;
     }
     else
     {
-        solutions++;
-        return 1;
+	solutions++;
+	return 1;
     }
 
     return n == i;
@@ -281,54 +322,54 @@ int main()
 
     while (1)
     {
-        for (n = 0;n < 81;n++)
-        {
-            while ((o = getchar()) != EOF && o < 33)
-                ;
-            if ( o == EOF)
-                return 0;
-            o ^= 48;
-            q[n] = (o > 9 || o == 0) ? 0 : 1 << o;
-        }
+	for (n = 0;n < 81;n++)
+	{
+	    while ((o = getchar()) != EOF && o < 33)
+		;
+	    if ( o == EOF)
+		return 0;
+	    o ^= 48;
+	    q[n] = (o > 9 || o == 0) ? 0 : 1 << o;
+	}
 
-        t1 = t();
+	t1 = t();
 
 
-        if ( check(q) )
-        {
-            solutions = -1;
-        }
-        else
-        {
-            solutions = 0;
-            solve(q);
-        }
+	if ( check(q) )
+	{
+	    solutions = -1;
+	}
+	else
+	{
+	    solutions = 0;
+	    solve(q);
+	}
 
-        switch ( solutions )
-        {
-            case 0:
-                printf("Case %d: Impossible.\n", c);
-                break;
-            case 1:
-                printf("Case %d: Unique.\n", c);
-                break;
-            case - 1:
-                printf("Case %d: Illegal.\n", c);
-                break;
-            default:
-                printf("Case %d: Ambigous.\n", c);
-                break;
-        }
+	switch ( solutions )
+	{
+	    case 0:
+		printf("Case %d: Impossible.\n", c);
+		break;
+	    case 1:
+		printf("Case %d: Unique.\n", c);
+		break;
+	    case - 1:
+		printf("Case %d: Illegal.\n", c);
+		break;
+	    default:
+		printf("Case %d: Ambigous.\n", c);
+		break;
+	}
 
-        t2 = t();
-        f = (t2 - t1);
+	t2 = t();
+	f = (t2 - t1);
 #define TIME
 #ifdef TIME
-        printf("time: %e millisecs solutions: %d\n", f, solutions) ;
+	printf("time: %e millisecs solutions: %d\n", f, solutions) ;
 #endif
 
 
-        c++;
+	c++;
     }
     return 0;
 }
