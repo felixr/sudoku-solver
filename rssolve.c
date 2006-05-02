@@ -82,8 +82,9 @@ int bitcount (unsigned int n)
 
 int solutions, n, q[81];
 
-
-
+/* 
+ * print sudoku grid 
+ */
 inline static void print_sudoku(int *s)
 {
     int c;
@@ -104,16 +105,18 @@ inline static void print_sudoku(int *s)
 int check(int *p)
 {
     int i, j;
-    for (i = 0; i < 81; i++)
+
+
+    for (i = 0; i < 9; i++)
     {
         int box_a = 0, box_b = 0, row_a = 0, row_b = 0, col_a = 0, col_b = 0;
         j = 0;
         while (j < 9)
         {
-            box_a |= BOX(p, i, j); box_b += BOX(p, i, j);
             col_a |= COL(p, i, j); col_b += COL(p, i, j);
-            row_a |= ROW(p, i, j); row_b += ROW(p, i, j);
-
+            row_a |= ROW(p, i*9, j); row_b += ROW(p, i*9, j);
+            box_a |= BOX(p, (i%3*3)+(i/3)*27 , j); 
+	    box_b += BOX(p, (i%3*3)+(i/3)*27 , j); 
             j++;
         }
 
@@ -239,7 +242,10 @@ int main()
 
         t2 = t();
         f = (t2 - t1);
+#define TIME
+#ifdef TIME
         printf("time: %e millisecs solutions: %d\n", f, solutions) ;
+#endif
 
 
         c++;
