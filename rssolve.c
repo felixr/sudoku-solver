@@ -1,10 +1,23 @@
 /* vim: set sw=4:  */
-
+/*
+ *
+ * rssolve.c
+ *
+ * $Revision: 1.3 $
+ *
+ */
 #include <stdio.h>
 #include <time.h>
 #include <sys/resource.h>
 
 #define RESOLUTION              1000000L
+
+
+#define TIME
+#define AMBIGIOUS
+//#define ONE_SOLUTION 
+#define USE_TABLE
+//#define SLOW 
 
 static long t()
 {
@@ -14,9 +27,8 @@ static long t()
 }
 
 
-#define TABLE
 
-#ifndef TABLE
+#ifndef USE_TABLE
 #define BOX(X,R,C) X[R / 27 * 27 + C / 3 * 6 + R % 9 / 3 * 3 + C]
 #define ROW(X,R,C) X[R / 9 * 9 + C]
 #define COL(X,R,C) X[C * 9 + R % 9]
@@ -51,14 +63,22 @@ static const int boxes[N][N] =
         {60, 61, 62, 69, 70, 71, 78, 79, 80}
     };
 
-#define BOX(X,I,O) X[ boxes[ cellbox_map[I]][O]]
-#define FBOX(X,I,O) X[ boxes[I][O]]
-#define ROW(X,R,C) X[R / 9 * 9 + C]
-#define COL(X,R,C) X[C * 9 + R % 9]
+
+#define NBOX(X,BOX,OFFSET) X[ boxes[BOX][OFFSET]]
+#define NROW(X,ROW,OFFSET) X[OFFSET   + 9*ROW]
+#define NCOL(X,COL,OFFSET) X[OFFSET*9 + COL]
+
+#define BOXNUM(I) cellbox_map[I]
+#define ROWNUM(I) (I/9)
+#define COLNUM(I) (I%9)
+
+#define BOX(X,I,OFFSET) NBOX(X,BOXNUM(I),OFFSET)
+#define ROW(X,I,OFFSET) NROW(X,ROWNUM(I), OFFSET)   
+#define COL(X,I,OFFSET) NCOL(X,COLNUM(I),OFFSET) 
 
 #define GETCOVER(C,I,J) { int box=cellbox_map[i]; \
         for (J = 0; J < 9; J++) {\
-            a |= FBOX(C,box,J) | COL(C,I,J) | ROW(C,I,J);\
+            a |= NBOX(C,box,J) | COL(C,I,J) | ROW(C,I,J);\
         }}
 
 #endif
@@ -81,6 +101,14 @@ int bitcount (unsigned int n)
 
 
 int solutions, n, q[81];
+
+void rbp(int n)
+{
+    int i;
+    for (i=2<<9; i>0; i=i>>1)
+	putchar( ( (i&n) ? '1' : '0') );
+
+}
 
 /* 
  * print sudoku grid 
@@ -128,25 +156,61 @@ int check(int *p)
     return 0;
 }
 
+enum { BOX=0, COL=1, ROW=2 }; 
+
 int solve(int *p)
 {
     int i = 81, j = 0, a = 0;
     int x = 1;
     int c[81];
+#ifndef SLOW 
+    int cover[3][9];
+#endif
+
+#ifndef ONE_SOLUTION 
+    if (solutions > 0) return 0;
+#endif
+
+#ifndef AMBIGIOUS
+    if (solutions > 1) return 0;
+#endif
 
     for (n = 0; n < 81; n++)
         c[n] = p[n];
 
     /* find forced cells */
+#ifndef SLOW 
+    for (i = 0; i < 9; i++)
+    {
+	cover[BOX][i] = cover[COL][i] = cover[ROW][i] = 0; 
+	for (j = 0; j < 9; j++) {
+	    cover[BOX][i] |= NBOX(c, i, j);
+	    cover[COL][i] |= NCOL(c, i, j);
+	    cover[ROW][i] |= NROW(c, i, j);
+	}
+    }
+#endif
+
     while (x)
     {
+
         x = 0;
         for (i = 0; i < 81; i++)
         {
             if ( c[i] == 0 )
             {
+		
+
+#ifndef SLOW
+		a =   cover[BOX][ BOXNUM(i) ] 
+		    | cover[ROW][ ROWNUM(i) ]
+		    | cover[COL][ COLNUM(i) ];
+#else
+
                 a = 0;
                 GETCOVER(c, i, j);
+#endif
+
                 if ( bitcount(a) == 8 )
                 {
                     int d;
@@ -154,6 +218,13 @@ int solve(int *p)
                         if ( ~a & d )
                         {
                             c[i] = d;
+
+#ifndef SLOW
+			    cover[BOX][ BOXNUM(i) ]  |= d;
+			    cover[ROW][ ROWNUM(i) ]  |= d;
+			    cover[COL][ COLNUM(i) ]  |= d;
+#endif
+
                             x++;
                             break;
                         }
@@ -173,7 +244,16 @@ int solve(int *p)
 
     if ( i >= 0 )
     {
-        GETCOVER(c, i, j);
+#ifndef SLOW
+		a =   cover[BOX][ BOXNUM(i) ] 
+		    | cover[ROW][ ROWNUM(i) ]
+		    | cover[COL][ COLNUM(i) ];
+#else
+
+                a = 0;
+                GETCOVER(c, i, j);
+#endif
+
         for (j = 2;j < 1024;j *= 2)
             if (~a & j)
             {
