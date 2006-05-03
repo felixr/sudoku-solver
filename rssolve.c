@@ -3,7 +3,7 @@
  *
  * rssolve.c
  *
- * $Revision: 1.5 $
+ * $Revision: 1.6 $
  *
  */
 
@@ -247,7 +247,7 @@ int solve(int *p)
                             {
                                 if (c[mi] == 0)
                                 {
-                                    a |= ~(cover[BOX][box] | cover[ROW][mrow ] | cover[COL][mcol]);
+                                    a |= ~(cover[ROW][mrow ] | cover[COL][mcol]);
                                 }
                                 else
                                 {
@@ -256,6 +256,7 @@ int solve(int *p)
                             }
                         }
                         a = ~a;
+			a &= ~(cover[BOX][box]);
 
                         if ( a&b && bitcount(a) == 1 )
                         {
