@@ -3,7 +3,7 @@
  *
  * rssolve.c
  *
- * $Revision: 1.6 $
+ * $Revision: 1.7 $
  *
  */
 
@@ -14,10 +14,11 @@
 #define RESOLUTION              1000000L
 
 
-#define TIME
-#define AMBIGIOUS
+//#define TIME
+//#define AMBIGIOUS
 //#define ONE_SOLUTION
 #define USE_TABLE
+//#define PURE_BT
 
 static long t()
 {
@@ -196,6 +197,7 @@ int solve(int *p)
         }
     }
 
+#ifndef PURE_BT
     while (x)
     {
         int row;
@@ -215,10 +217,8 @@ int solve(int *p)
                     int box = BOXNUM(i);
 		    int bc;
 
-                    a =   cover[BOX][ BOXNUM(i) ]
-                          | cover[ROW][ row ]
-                          | cover[COL][ col ];
-                    a = ~a & 1022;
+                    a =  cover[BOX][ box ] | cover[ROW][ row ] | cover[COL][ col ];
+		    a = ~a & 1022;
 
 		    bc = bitcount(a);
                     if ( bc == 1 )
@@ -232,11 +232,9 @@ int solve(int *p)
 #ifdef ONE_CELL
                     else
                     {
-                        int b = a;
                         /* find one cells */
-                        a = 0;
-                        //
-                        //foreach cell in box
+                        int b = a;
+                        a = 0xFFFFFFFF;
                         for (j=0; j<9; j++)
                         {
                             int mrow = (j/3) + (box/3)*3;
@@ -246,22 +244,15 @@ int solve(int *p)
                             if ( mrow != row || mcol != col)
                             {
                                 if (c[mi] == 0)
-                                {
-                                    a |= ~(cover[ROW][mrow ] | cover[COL][mcol]);
-                                }
+                                    a &= (cover[ROW][mrow ] | cover[COL][mcol]);
                                 else
-                                {
-                                    a |= c[mi];
-                                }
+                                    a &= ~c[mi];
                             }
                         }
-                        a = ~a;
 			a &= ~(cover[BOX][box]);
 
                         if ( a&b && bitcount(a) == 1 )
-                        {
                             update = 1;
-                        }
                     }
 #endif
 
@@ -278,6 +269,7 @@ int solve(int *p)
                 } /* endif c[i] == 0 */
             }
     } /* while (x)*/
+#endif
 
 
     i = -1;
@@ -362,10 +354,9 @@ int main()
 
         t2 = t();
         f = (t2 - t1);
-#define TIME
 #ifdef TIME
 
-        printf("time: %e millisecs solutions: %d\n", f, solutions) ;
+        printf("time: %e micro seconds\t\tsolutions: %d\n", f, solutions) ;
 #endif
 
 
