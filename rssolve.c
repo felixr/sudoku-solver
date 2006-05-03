@@ -3,7 +3,7 @@
  *
  * rssolve.c
  *
- * $Revision: 1.4 $
+ * $Revision: 1.5 $
  *
  */
 
@@ -16,7 +16,7 @@
 
 #define TIME
 #define AMBIGIOUS
-#define ONE_SOLUTION 
+//#define ONE_SOLUTION
 #define USE_TABLE
 
 static long t()
@@ -50,7 +50,9 @@ static const int cellbox_map[N*N] =
 
 static const int boxes[N][N] =
     {
-        { 0, 1, 2, 9, 10, 11, 18, 19, 20},
+        {
+            0, 1, 2, 9, 10, 11, 18, 19, 20
+        },
         { 3, 4, 5, 12, 13, 14, 21, 22, 23},
         { 6, 7, 8, 15, 16, 17, 24, 25, 26},
         {27, 28, 29, 36, 37, 38, 45, 46, 47},
@@ -71,13 +73,13 @@ static const int boxes[N][N] =
 #define COLNUM(I) (I%9)
 
 #define BOX(X,I,OFFSET) NBOX(X,BOXNUM(I),OFFSET)
-#define ROW(X,I,OFFSET) NROW(X,ROWNUM(I), OFFSET)   
-#define COL(X,I,OFFSET) NCOL(X,COLNUM(I),OFFSET) 
+#define ROW(X,I,OFFSET) NROW(X,ROWNUM(I), OFFSET)
+#define COL(X,I,OFFSET) NCOL(X,COLNUM(I),OFFSET)
 
 #define GETCOVER(C,I,J) { int box=cellbox_map[i]; \
-        for (J = 0; J < 9; J++) {\
-            a |= NBOX(C,box,J) | COL(C,I,J) | ROW(C,I,J);\
-        }}
+    for (J = 0; J < 9; J++) {\
+	a |= NBOX(C,box,J) | COL(C,I,J) | ROW(C,I,J);\
+    }}
 
 #endif
 
@@ -105,12 +107,12 @@ int debug = 0;
 void rbp(int n)
 {
     int i;
-    for (i=2<<15; i>0; i=i>>1)
-	putchar( ( (i&n) ? '1' : '0') );
+    for (i=2<<10; i>0; i=i>>1)
+        putchar( ( (i&n) ? '1' : '0') );
 
 }
 
-/* 
+/*
  * print sudoku grid 
  */
 inline static void print_sudoku(int *s)
@@ -118,11 +120,12 @@ inline static void print_sudoku(int *s)
     int c;
     for (n = 0;n < 81;n++)
     {
-	/* 48 = '0', 49 = '1',... */
-	for (c = 48; s[n] /= 2; c++);
-	putchar(c);
-	if (n % 9 == 8)
-	    puts("");
+        /* 48 = '0', 49 = '1',... */
+        for (c = 48; s[n] /= 2; c++)
+            ;
+        putchar(c);
+        if (n % 9 == 8)
+            puts("");
     }
     puts("");
 }
@@ -141,10 +144,12 @@ int check(int *p)
         j = 0;
         while (j < 9)
         {
-            col_a |= COL(p, i, j); col_b += COL(p, i, j);
-            row_a |= ROW(p, i*9, j); row_b += ROW(p, i*9, j);
-            box_a |= BOX(p, (i%3*3)+(i/3)*27 , j); 
-	    box_b += BOX(p, (i%3*3)+(i/3)*27 , j); 
+            col_a |= COL(p, i, j);
+            col_b += COL(p, i, j);
+            row_a |= ROW(p, i*9, j);
+            row_b += ROW(p, i*9, j);
+            box_a |= BOX(p, (i%3*3)+(i/3)*27 , j);
+            box_b += BOX(p, (i%3*3)+(i/3)*27 , j);
             j++;
         }
 
@@ -156,7 +161,7 @@ int check(int *p)
     return 0;
 }
 
-enum { BOX=0, COL=1, ROW=2 }; 
+enum { BOX=0, COL=1, ROW=2 };
 
 int solve(int *p)
 {
@@ -165,12 +170,16 @@ int solve(int *p)
     int c[81];
     int cover[3][9];
 
-#ifndef ONE_SOLUTION 
-    if (solutions > 0) return 0;
+#ifdef ONE_SOLUTION
+
+    if (solutions > 0)
+        return 0;
 #endif
 
 #ifndef AMBIGIOUS
-    if (solutions > 1) return 0;
+
+    if (solutions > 1)
+        return 0;
 #endif
 
     for (n = 0; n < 81; n++)
@@ -178,135 +187,124 @@ int solve(int *p)
 
     for (i = 0; i < 9; i++)
     {
-	cover[BOX][i] = cover[COL][i] = cover[ROW][i] = 0; 
-	for (j = 0; j < 9; j++) {
-	    cover[BOX][i] |= NBOX(c, i, j);
-	    cover[COL][i] |= NCOL(c, i, j);
-	    cover[ROW][i] |= NROW(c, i, j);
-	}
+        cover[BOX][i] = cover[COL][i] = cover[ROW][i] = 0;
+        for (j = 0; j < 9; j++)
+        {
+            cover[BOX][i] |= NBOX(c, i, j);
+            cover[COL][i] |= NCOL(c, i, j);
+            cover[ROW][i] |= NROW(c, i, j);
+        }
     }
 
     while (x)
     {
-	int row;
-	int col;
+        int row;
+        int col;
 
         x = 0;
-	for (row = 0; row < 9; row++) 
-	    for (col = 0; col< 9; col++) 
-	    {
-		i = (row*9)+col;
+        for (row = 0; row < 9; row++)
+            for (col = 0; col< 9; col++)
+            {
+                int update = 0;
 
-		/* find forced cells */
-		if ( c[i] == 0 )
-		{
-		    a =   cover[BOX][ BOXNUM(i) ] 
-			| cover[ROW][ row ]
-			| cover[COL][ col ];
+                i = (row*9)+col;
 
-		    if ( bitcount(a) == 8 )
+                /* find forced cells */
+                if ( c[i] == 0 )
+                {
+                    int box = BOXNUM(i);
+		    int bc;
+
+                    a =   cover[BOX][ BOXNUM(i) ]
+                          | cover[ROW][ row ]
+                          | cover[COL][ col ];
+                    a = ~a & 1022;
+
+		    bc = bitcount(a);
+                    if ( bc == 1 )
+                    {
+                        update = 1;
+                    }else if ( bc == 0)
 		    {
-			int d;
-			for ( d = 2; d < 1024; d *= 2)
-			    if ( ~a & d )
-			    {
-				c[i] = d;
-
-				cover[BOX][ BOXNUM(i) ]  |= d;
-				cover[ROW][ row ]  |= d;
-				cover[COL][ col ]  |= d;
-
-				x++;
-				break;
-			    }
+			return 0; /* impossible */
 		    }
-		}
+#define ONE_CELL
+#ifdef ONE_CELL
+                    else
+                    {
+                        int b = a;
+                        /* find one cells */
+                        a = 0;
+                        //
+                        //foreach cell in box
+                        for (j=0; j<9; j++)
+                        {
+                            int mrow = (j/3) + (box/3)*3;
+                            int mcol = (j%3) + (box%3)*3;
+                            int mi = mrow*9+mcol;
 
-#if 0
-		/* find one cells */
-		if ( c[i] == 0 )
-		{
-		    int box = BOXNUM(i);
-		    a = 0;
-		    printf("i=%d ",i);
-		    //foreach cell in box
-		    for (j=0; j<9; j++)
-		    {
-			int mrow = (j/3) + (box/3)*3;
-			int mcol = (j%3) + (box%3)*3;
-			int mi = mrow*9+mcol;
+                            if ( mrow != row || mcol != col)
+                            {
+                                if (c[mi] == 0)
+                                {
+                                    a |= ~(cover[BOX][box] | cover[ROW][mrow ] | cover[COL][mcol]);
+                                }
+                                else
+                                {
+                                    a |= c[mi];
+                                }
+                            }
+                        }
+                        a = ~a;
 
-			printf("%d\n",mi);
-
-			//if ( mrow != row || mcol != col) 
-			{
-			    int b = cover[BOX][box] | cover[ROW][mrow ] | cover[COL][mcol];
-			    a |= b;
-			    rbp(a);printf("\n");
-			}
-		    }
-
-		    a = ~a;
-		    rbp(a);printf("\n\n");
-
-		   // if (debug++ > 100) exit(1);
-		    
-		    if ( bitcount(a) > 0 )
-			return 0;
-
-		    if ( bitcount(a) == 1 )
-		    {
-			int d;
-
-			rbp(a);printf("\n\n");
-			return 0;
-
-			for ( d = 2; d < 1024; d *= 2)
-			    if ( a & d )
-			    {
-					c[i] = d;
-
-					cover[BOX][ BOXNUM(i) ]  |= d;
-					cover[ROW][ row ]  |= d;
-					cover[COL][ col ]  |= d;
-
-				x++;
-				break;
-			    }
-		    }
-		}
+                        if ( a&b && bitcount(a) == 1 )
+                        {
+                            update = 1;
+                        }
+                    }
 #endif
 
-	    }
-    }
+                    if (update == 1)
+                    {
+                        c[i] = a;
+
+                        cover[BOX][ box ]  |= a;
+                        cover[ROW][ row ]  |= a;
+                        cover[COL][ col ]  |= a;
+
+                        x++;
+                    }
+                } /* endif c[i] == 0 */
+            }
+    } /* while (x)*/
 
 
     i = -1;
     for (n = 80; n > 0 ; n--)
-	if (c[n] == 0 )
-	{
-	    i = n;
-	    break;
-	}
+        if (c[n] == 0 )
+        {
+            i = n;
+            break;
+        }
 
     if ( i >= 0 )
     {
-	a =   cover[BOX][ BOXNUM(i) ] 
-	    | cover[ROW][ ROWNUM(i) ]
-	    | cover[COL][ COLNUM(i) ];
+        a =   cover[BOX][ BOXNUM(i) ]
+              | cover[ROW][ ROWNUM(i) ]
+              | cover[COL][ COLNUM(i) ];
 
-	for (j = 2;j < 1024;j *= 2)
-	    if (~a & j)
-	    {
-		c[i] = j;
-		solve(c);
-	    }
-	return 0;
+        for (j = 2;j < 1024;j *= 2)
+            if (~a & j)
+            {
+                c[i] = j;
+                solve(c);
+            }
+        return 0;
     }
     else
     {
-	solutions++;
-	return 1;
+        solutions++;
+        return 1;
     }
 
     return n == i;
@@ -322,54 +320,55 @@ int main()
 
     while (1)
     {
-	for (n = 0;n < 81;n++)
-	{
-	    while ((o = getchar()) != EOF && o < 33)
-		;
-	    if ( o == EOF)
-		return 0;
-	    o ^= 48;
-	    q[n] = (o > 9 || o == 0) ? 0 : 1 << o;
-	}
+        for (n = 0;n < 81;n++)
+        {
+            while ((o = getchar()) != EOF && o < 33)
+                ;
+            if ( o == EOF)
+                return 0;
+            o ^= 48;
+            q[n] = (o > 9 || o == 0) ? 0 : 1 << o;
+        }
 
-	t1 = t();
+        t1 = t();
 
 
-	if ( check(q) )
-	{
-	    solutions = -1;
-	}
-	else
-	{
-	    solutions = 0;
-	    solve(q);
-	}
+        if ( check(q) )
+        {
+            solutions = -1;
+        }
+        else
+        {
+            solutions = 0;
+            solve(q);
+        }
 
-	switch ( solutions )
-	{
-	    case 0:
-		printf("Case %d: Impossible.\n", c);
-		break;
-	    case 1:
-		printf("Case %d: Unique.\n", c);
-		break;
-	    case - 1:
-		printf("Case %d: Illegal.\n", c);
-		break;
-	    default:
-		printf("Case %d: Ambigous.\n", c);
-		break;
-	}
+        switch ( solutions )
+        {
+        case 0:
+            printf("Case %d: Impossible.\n", c);
+            break;
+        case 1:
+            printf("Case %d: Unique.\n", c);
+            break;
+        case - 1:
+            printf("Case %d: Illegal.\n", c);
+            break;
+        default:
+            printf("Case %d: Ambigous.\n", c);
+            break;
+        }
 
-	t2 = t();
-	f = (t2 - t1);
+        t2 = t();
+        f = (t2 - t1);
 #define TIME
 #ifdef TIME
-	printf("time: %e millisecs solutions: %d\n", f, solutions) ;
+
+        printf("time: %e millisecs solutions: %d\n", f, solutions) ;
 #endif
 
 
-	c++;
+        c++;
     }
     return 0;
 }
