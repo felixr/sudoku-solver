@@ -3,7 +3,7 @@
  *
  * rssolve.c
  *
- * $Revision: 1.7 $
+ * $Revision: 1.8 $
  *
  */
 
@@ -13,24 +13,42 @@
 
 #define RESOLUTION              1000000L
 
-
 //#define TIME
-//#define AMBIGIOUS
+//#define AMBIGIOUS 
+//#define ONLY_CELL
 //#define ONE_SOLUTION
-#define USE_TABLE
-//#define PURE_BT
+#define USE_TABLE 
+#define PURE_BT
 
+#ifdef TIME
 static long t()
 {
     struct rusage ru;
     getrusage(RUSAGE_SELF, &ru);
     return (ru.ru_utime.tv_sec + ru.ru_stime.tv_sec) * RESOLUTION + ru.ru_utime.tv_usec + ru.ru_stime.tv_usec;
 }
+#endif
 
 #ifndef USE_TABLE
-#define BOX(X,R,C) X[R / 27 * 27 + C / 3 * 6 + R % 9 / 3 * 3 + C]
+
 #define ROW(X,R,C) X[R / 9 * 9 + C]
 #define COL(X,R,C) X[C * 9 + R % 9]
+
+#define NROW(X,ROW,OFFSET) X[OFFSET   + 9*ROW]
+#define NCOL(X,COL,OFFSET) X[OFFSET*9 + COL]
+
+#define BOXNUM(I) ((I/27*3)+(I%9/3))
+#define ROWNUM(I) (I/9)
+#define COLNUM(I) (I%9)
+
+#define NROW(X,ROW,OFFSET) X[OFFSET   + 9*ROW]
+#define NCOL(X,COL,OFFSET) X[OFFSET*9 + COL]
+
+#define BOX(X,I,OFFSET) X[I / 27 * 27 + OFFSET / 3 * 6 + I % 9 / 3 * 3 + OFFSET]
+#define ROW(X,I,OFFSET) NROW(X,ROWNUM(I), OFFSET)
+#define COL(X,I,OFFSET) NCOL(X,COLNUM(I),OFFSET)
+
+
 #define GETCOVER(C,I,J) { for (J = 0; J < 9; J++) { a |= BOX(C,I,J) | COL(C,I,J) | ROW(C,I,J); }}
 
 #else
@@ -78,9 +96,9 @@ static const int boxes[N][N] =
 #define COL(X,I,OFFSET) NCOL(X,COLNUM(I),OFFSET)
 
 #define GETCOVER(C,I,J) { int box=cellbox_map[i]; \
-    for (J = 0; J < 9; J++) {\
-	a |= NBOX(C,box,J) | COL(C,I,J) | ROW(C,I,J);\
-    }}
+        for (J = 0; J < 9; J++) {\
+            a |= NBOX(C,box,J) | COL(C,I,J) | ROW(C,I,J);\
+        }}
 
 #endif
 
@@ -108,8 +126,8 @@ int debug = 0;
 void rbp(int n)
 {
     int i;
-    for (i=2<<10; i>0; i=i>>1)
-        putchar( ( (i&n) ? '1' : '0') );
+    for (i = 2 << 10; i > 0; i = i >> 1)
+        putchar( ( (i & n) ? '1' : '0') );
 
 }
 
@@ -137,20 +155,19 @@ inline static void print_sudoku(int *s)
 int check(int *p)
 {
     int i, j;
-
-
     for (i = 0; i < 9; i++)
     {
         int box_a = 0, box_b = 0, row_a = 0, row_b = 0, col_a = 0, col_b = 0;
         j = 0;
         while (j < 9)
         {
-            col_a |= COL(p, i, j);
-            col_b += COL(p, i, j);
-            row_a |= ROW(p, i*9, j);
-            row_b += ROW(p, i*9, j);
-            box_a |= BOX(p, (i%3*3)+(i/3)*27 , j);
-            box_b += BOX(p, (i%3*3)+(i/3)*27 , j);
+            /* TODO: optimize this */
+            col_a |= NCOL(p, i, j);
+            col_b += NCOL(p, i, j);
+            row_a |= NROW(p, i, j);
+            row_b += NROW(p, i, j);
+            box_a |= NBOX(p, i, j);
+            box_b += NBOX(p, i, j);
             j++;
         }
 
@@ -162,9 +179,9 @@ int check(int *p)
     return 0;
 }
 
-enum { BOX=0, COL=1, ROW=2 };
+enum { BOX = 0, COL = 1, ROW = 2 };
 
-int solve(int *p)
+int solve(int *p, int pc[][9], int updated)
 {
     int i = 81, j = 0, a = 0;
     int x = 1;
@@ -186,15 +203,33 @@ int solve(int *p)
     for (n = 0; n < 81; n++)
         c[n] = p[n];
 
-    for (i = 0; i < 9; i++)
+    if ( pc == NULL)
     {
-        cover[BOX][i] = cover[COL][i] = cover[ROW][i] = 0;
-        for (j = 0; j < 9; j++)
+        /* fill in cover */
+        for (i = 0; i < 9; i++)
         {
-            cover[BOX][i] |= NBOX(c, i, j);
-            cover[COL][i] |= NCOL(c, i, j);
-            cover[ROW][i] |= NROW(c, i, j);
+            cover[BOX][i] = cover[COL][i] = cover[ROW][i] = 0;
+            for (j = 0; j < 9; j++)
+            {
+                cover[BOX][i] |= NBOX(c, i, j);
+                cover[COL][i] |= NCOL(c, i, j);
+                cover[ROW][i] |= NROW(c, i, j);
+            }
         }
+    }
+    else
+    {
+        /* copy & update cover */
+        for (n = 0; n < 9; n++)
+        {
+            cover[BOX][n] = pc[BOX][n];
+            cover[COL][n] = pc[COL][n];
+            cover[ROW][n] = pc[ROW][n];
+        }
+
+        cover[BOX][ BOXNUM(updated) ] |= c[updated] ;
+        cover[COL][ COLNUM(updated) ] |= c[updated] ;
+        cover[ROW][ ROWNUM(updated) ] |= c[updated] ;
     }
 
 #ifndef PURE_BT
@@ -204,69 +239,93 @@ int solve(int *p)
         int col;
 
         x = 0;
+        i = 0;
         for (row = 0; row < 9; row++)
-            for (col = 0; col< 9; col++)
+            for (col = 0; col < 9; col++)
             {
                 int update = 0;
 
-                i = (row*9)+col;
-
-                /* find forced cells */
                 if ( c[i] == 0 )
                 {
                     int box = BOXNUM(i);
-		    int bc;
+                    int bc;
 
-                    a =  cover[BOX][ box ] | cover[ROW][ row ] | cover[COL][ col ];
-		    a = ~a & 1022;
+                    /* find forced cells */
+                    a = cover[BOX][ box ] | cover[ROW][ row ] | cover[COL][ col ];
+                    a = ~a & 1022;
 
-		    bc = bitcount(a);
+                    bc = bitcount(a);
                     if ( bc == 1 )
                     {
                         update = 1;
-                    }else if ( bc == 0)
-		    {
-			return 0; /* impossible */
-		    }
-#define ONE_CELL
-#ifdef ONE_CELL
+                    }
+                    else if ( bc == 0)
+                    { 
+                        /* SPEEDUP: this is a major speed-up for
+                         * unique solutions but doesn't
+                         * help on large multiple sol */
+                        return 0; 
+                     }
+
+#ifdef ONLY_CELL
                     else
                     {
-                        /* find one cells */
+                        /* find only cells */
                         int b = a;
-                        a = 0xFFFFFFFF;
-                        for (j=0; j<9; j++)
+                        int b1 = (box / 3) * 3;
+                        int b2 = (box % 3) * 3;
+                        int mrow;
+                        int mcol; 
+                        int mi;
+
+                        //a = 0xFFFFFFFF;
+                        a ^= a;
+                        a -= 1;
+
+//                        for (j = 0; j < 9; j++)
+                        mi = b2+b1*9;
+                        for (mrow=b1; mrow < b1+3; mrow++)                        
                         {
-                            int mrow = (j/3) + (box/3)*3;
-                            int mcol = (j%3) + (box%3)*3;
-                            int mi = mrow*9+mcol;
-
-                            if ( mrow != row || mcol != col)
+                            mi = mrow * 9 + b2;
+                            for (mcol=b2; mcol < b2+3; mcol++)                        
                             {
-                                if (c[mi] == 0)
-                                    a &= (cover[ROW][mrow ] | cover[COL][mcol]);
-                                else
-                                    a &= ~c[mi];
-                            }
-                        }
-			a &= ~(cover[BOX][box]);
+            //                    int mrow = (j / 3) + b1;
+              //                  int mcol = (j % 3) + b2;
 
-                        if ( a&b && bitcount(a) == 1 )
-                            update = 1;
+                                if ( mrow != row || mcol != col)
+                                {
+                                    if (c[mi] == 0)
+                                        a &= (cover[ROW][mrow ] | cover[COL][mcol]);
+                                    else
+                                        a &= ~c[mi];
+                                }
+                                mi++;
+                            }
+                            mi+=6;
+                        }
+                        a &= ~(cover[BOX][box]);
+                        if (a&b && bitcount(a) == 1 )
+                            update = 1 ;
+#if 1
+                        else if (a) 
+                            return 0;
+#endif
+                        /* SPEEDUP: this is a major speed-up for
+                         * unique solutions but makes search
+                         * for multiple solutions somehow slower */
                     }
 #endif
-
                     if (update == 1)
                     {
                         c[i] = a;
 
-                        cover[BOX][ box ]  |= a;
-                        cover[ROW][ row ]  |= a;
-                        cover[COL][ col ]  |= a;
-
+                        cover[BOX][ box ] |= a;
+                        cover[ROW][ row ] |= a;
+                        cover[COL][ col ] |= a;
                         x++;
                     }
                 } /* endif c[i] == 0 */
+                i++;
             }
     } /* while (x)*/
 #endif
@@ -282,15 +341,16 @@ int solve(int *p)
 
     if ( i >= 0 )
     {
-        a =   cover[BOX][ BOXNUM(i) ]
-              | cover[ROW][ ROWNUM(i) ]
-              | cover[COL][ COLNUM(i) ];
+        a = cover[BOX][ BOXNUM(i) ]
+            | cover[ROW][ ROWNUM(i) ]
+            | cover[COL][ COLNUM(i) ];
 
         for (j = 2;j < 1024;j *= 2)
             if (~a & j)
             {
                 c[i] = j;
-                solve(c);
+                //solve(c,NULL,0);
+                solve(c, cover, i);
             }
         return 0;
     }
@@ -306,8 +366,12 @@ int solve(int *p)
 int main()
 {
     int o;
+#ifdef TIME
+
     long t1, t2;
     float f;
+#endif
+
     int c = 1;
 
 
@@ -323,18 +387,16 @@ int main()
             q[n] = (o > 9 || o == 0) ? 0 : 1 << o;
         }
 
+#ifdef TIME
         t1 = t();
+#endif
 
+        solutions = 0;
 
         if ( check(q) )
-        {
             solutions = -1;
-        }
         else
-        {
-            solutions = 0;
-            solve(q);
-        }
+            solve(q, NULL, 0);
 
         switch ( solutions )
         {
@@ -352,13 +414,11 @@ int main()
             break;
         }
 
+#ifdef TIME
         t2 = t();
         f = (t2 - t1);
-#ifdef TIME
-
         printf("time: %e micro seconds\t\tsolutions: %d\n", f, solutions) ;
 #endif
-
 
         c++;
     }
