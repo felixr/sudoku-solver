@@ -184,7 +184,6 @@ enum { BOX = 0, COL = 1, ROW = 2 };
 int solve(int *p, int pc[][9], int updated)
 {
     int i = 81, j = 0, a = 0;
-    int x = 1;
     int c[81];
     int cover[3][9];
 
